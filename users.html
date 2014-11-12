@@ -1,3 +1,11 @@
+<!DOCTYPE html>
+ 
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>CouchDB User Administration</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8" >
+
 <!-- 
 	NOTES: 
 		Only users in _admin role can use this tool.
@@ -22,19 +30,9 @@
 			}
 		}
 
-	REQUIRES:
-		change _design/_auth in _users to allow user updates. 
-		"validate_doc_update": "function(newDoc, oldDoc, userCtx, secObj) {if(userCtx.roles.indexOf('_admin') == -1) throw({forbidden : 'Only Admins can change user data.'});}"
-		
 -->
 
-<!DOCTYPE html>
- 
-<html xmlns="http://www.w3.org/1999/xhtml">
-<head>
-<title>CouchDB User Administration</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Type" content="text/html;charset=utf-8" >
+
 <script src="/_utils/script/json2.js"></script>
 <script src="/_utils/script/jquery.js?1.2.6"></script>
 <script src="/_utils/script/jquery.couch.js?0.8.0"></script>
@@ -178,8 +176,8 @@ $.couch.session({
     success: function(data) {
         if(data.userCtx.name) // if userCtx has a username, replace login form
         {$('#admin_login').html("Logged in as "+data.userCtx.name+". <a onClick=\"logout();\">Log Out</a><br />");
-        	//console.log(data.userCtx.roles);
-        	if(jQuery.inArray("_admin",data.userCtx.roles)>=0){
+        	console.log(data.userCtx.roles);
+        	if(jQuery.inArray("_admin",data.userCtx.roles)!==-1){
         	$('#admin_forms').show();
         	getUsers();
 		    	// update roles field based on selected users
@@ -254,7 +252,8 @@ for (var i = 0; i < toSplit.length; i++) {
 //
 $('#form_deleteUser').submit(function(e) { // delete a user
 	e.preventDefault();
-	if(loginCheck() && confirm("Are you sure you want to delete this user?")){
+	loginCheck();
+	if(confirm("Are you sure you want to delete this user?")){
 	var selectedUser = $(this).find("option:selected").attr("value");
 	$.each(users.rows, function(r) {
 		if(users.rows[r].id == selectedUser) 
