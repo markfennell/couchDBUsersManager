@@ -1,4 +1,4 @@
-<!--- 
+<!-- 
 	NOTES: 
 		Only users in _admin role can use this tool.
 		See note in javascript section below.
@@ -26,7 +26,7 @@
 		change _design/_auth in _users to allow user updates. 
 		"validate_doc_update": "function(newDoc, oldDoc, userCtx, secObj) {if(userCtx.roles.indexOf('_admin') == -1) throw({forbidden : 'Only Admins can change user data.'});}"
 		
---->
+-->
 
 <!DOCTYPE html>
  
