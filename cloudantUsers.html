@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+ 
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>CouchDB User Administration</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8" >
+
+<!-- 
+	NOTES: 
+		Only users in _admin role can use this tool.
+		See note in javascript section below.
+	
+	TO DO:
+		error checking
+		login timeout alert
+		DONE: isLoggedIn check before submit
+		DONE: passwd confirm
+		DONE: prevent null form submit
+		DONE: roles are flattened by text field
+		DONE: add "select one" to getUsers options
+		
+	REQUIRED FOR CLOUDANT:
+		Create _users db
+		Create listForSelect view in _users db
+		
+-->
+
+
+<script src="/_utils/script/json2.js"></script>
+<script src="/_utils/script/jquery.js?1.2.6"></script>
+<script src="/_utils/script/jquery.couch.js?0.8.0"></script>
+<script src="/_utils/script/jquery.form.js?0.9.0"></script>
+<script src="/_utils/script/sha1.js"></script>
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.0/css/bootstrap.min.css">
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.0/css/bootstrap-theme.min.css">
+</head>
+<body>
+<div class="container">
+
+	<!-- BEGIN login form -->
+	<div id="admin_login">
+		<form method="post" id="login_form" name="login_form" action="">
+		Login
+		<br />
+		<input type="text" id="uname" name="uname" placeholder="username">
+		<br />
+		<input type="password" id="passwd" name="passwd" placeholder="password">
+		<br />
+		<input type="submit" id="login_butt" value="login" class="btn btn-success">
+		</form>
+	</div>
+	<!-- END login form -->
+
+	<div id="admin_forms">
+		<div class="panel panel-default">
+			<div class="panel-heading">
+				<h3 class="panel-title">User Administration</h3>
+			</div>
+			<div class="panel-body">
+				<div class="row" style="margin-top: 1em;"><!-- begin create row -->
+				<div class="col-md-4" style="background-color: #090; color: #fff; font-size: 2em;">
+					create
+				</div>
+				<div class="col-md-8" style="border-top: 1px solid #090;">
+				<!-- begin create form -->
+				<form method="post" id="form_createUser" name="form_createUser" action="">
+					username 
+						<input type="text" name="new_username" id="new_username" placeholder="username"><br />
+					password 
+						<input type="text" name="new_passwd" id="new_passwd" placeholder="password"><br />
+					confirm password 
+						<input type="text" name="new_passwd0" id="new_passwd0" placeholder="confirm password"><br />
+					<!-- roles 
+						<input type="text" name="new_roles" id="new_roles" placeholder="roles"><br /> -->
+					<input type="submit" value="create user">
+				</form>
+				</div><!-- end create form -->
+				</div><!-- end create row -->
+				
+				
+				<div class="row" style="margin-top: 1em;"><!-- begin update row -->
+				<div class="col-md-4" style="background-color: #009; color: #fff; font-size: 2em;">
+					update
+				</div>
+				<div class="col-md-8" style="border-top: 1px solid #009;">
+				<!-- begin update form -->
+				<form method="post" id="form_updateUser" name="form_updateUser" action="">
+					username <select id="updateUser" name="updateUser"></select>
+						<br />
+					change password 
+						<input type="text" name="update_passwd" id="update_passwd" placeholder="password"><br/>
+					confirm password 
+						<input type="text" name="update_passwd0" id="update_passwd0" placeholder="confirm password"><br/>
+					roles 
+						<input type="text" name="update_roles" id="update_roles" placeholder="roles"><br/>
+					<input type="submit" value="update user">
+				</form>
+				</div><!-- end update form -->
+				</div><!-- end update row -->
+				
+				<div class="row" style="margin-top: 1em;"><!-- begin delete row -->
+				<div class="col-md-4" style="background-color: #900; color: #fff; font-size: 2em;">
+					delete
+				</div>
+				<div class="col-md-8" style="border-top: 1px solid #900;">
+				<!-- begin delete form -->
+				<form method="post" id="form_deleteUser" name="form_deleteUser" action="">
+					username <select id="deleteUser" name="deleteUser"></select>
+						<br />
+					<input type="submit" value="delete user">
+				</form>
+				</div><!-- end delete form -->
+				</div><!-- end delete row -->
+				
+				
+			</div>
+		</div>
+	</div>
+	
+</div>
+</body>
+<script type="text/javascript">
+var users = {}; // create a variable to hold users 
+	
+	// NOTE!
+	// A users variable may become unmanageable with large number of users.
+	// With a large number of users, calls against the users var will need to be made
+	// by $getJSON() directly against the db.
+
+$('#admin_forms').hide();
+
+function getUsers() {
+// creates a users array and populates the drop downs for update and delete user forms.
+		$.getJSON('/_users/_design/views/_view/listForSelect', function(data){ 
+		    users=data; // populate an array of users for update and delete
+		    $("#updateUser option").remove();
+		    $("#deleteUser option").remove();
+			$("#updateUser").append($("<option />").val("").text("Select one"));
+			$("#deleteUser").append($("<option />").val("").text("Select one"));
+		    	$.each(data.rows, function() {
+		    		$("#updateUser").append($("<option />").val(this.id).text(this.value));
+		    		$("#deleteUser").append($("<option />").val(this.id).text(this.value));
+		    		});
+		    	});
+		    	
+}
+
+function loginCheck(){ // check for login
+$.couch.session({
+	    success: function(data) {
+		if(data.userCtx.name) // if userCtx has a username, proceed
+			{
+			console.log("logged in");
+			return true;
+			}
+			else
+			{
+			alert("CHANGES NOT SAVED\r\nYour session has expired.\r\nReload this page to login again.");
+			logout();
+			return false;
+			}
+		},
+	    error: function(data) {
+	    	}
+    });
+}
+
+function doLogin(){ // login, check for _admin, build forms
+$.couch.session({
+    success: function(data) {
+        if(data.userCtx.name) // if userCtx has a username, replace login form
+        {$('#admin_login').html("Logged in as "+data.userCtx.name+". <a onClick=\"logout();\">Log Out</a><br />");
+        	console.log(data.userCtx.roles);
+        	if(jQuery.inArray("_admin",data.userCtx.roles)!==-1){
+        	$('#admin_forms').show();
+        	getUsers();
+		    	// update roles field based on selected users
+			$("#updateUser").live("change", function(u) {
+			var selectedUser = $(this).find("option:selected").attr("value");
+			$.each(users.rows, function(r) {
+				if(users.rows[r].id == selectedUser) 
+				{ $("#update_roles").val(users.rows[r].key[2]);}});
+			});
+        	}
+        }
+        else {$('#admin_login').html("Logged out."); // if there is no username, show logged out
+        $('#admin_forms').hide();}
+        ;
+    }
+});
+}
+
+//
+// update user processing
+//
+$('#form_updateUser').submit(function(e) { // update a user
+	e.preventDefault();
+	loginCheck();
+	if($('#update_passwd').val()!==$('#update_passwd0').val())
+	{
+		alert("Passwords do not match.");
+		return false;
+	}
+	var userDoc = {};
+	var selectedUser = $(this).find("option:selected").attr("value");
+	if(selectedUser==""){
+		alert("Cannot submit empty form.");
+		return false;
+	}
+
+var roles = [];
+var to = $('#update_roles').val();
+var toSplit = to.split(",");
+for (var i = 0; i < toSplit.length; i++) {
+    roles.push(toSplit[i]);
+}
+
+
+	$.each(users.rows, function(r) {
+		if(users.rows[r].id == selectedUser) 
+		{
+		userDoc = {		// json string 
+		_id:		users.rows[r].key[0],
+		_rev: 		users.rows[r].key[1],
+		type:		"user",
+		name:		users.rows[r].value,
+		password: 	$('#update_passwd').val(),
+		roles: 		roles};
+		}
+		});
+		console.log(userDoc);
+	$.couch.db("_users").saveDoc( userDoc , { 
+		success: function(){ 
+			console.log("user updated"); 
+			$('#update_passwd').val(""); 
+			$('#update_passwd0').val(""); 
+			$('#update_roles').val(""); 
+			getUsers();},
+		error: function(){ console.log("user not updated");}
+	});
+});
+
+
+//
+// delete user processing
+//
+$('#form_deleteUser').submit(function(e) { // delete a user
+	e.preventDefault();
+	loginCheck();
+	if(confirm("Are you sure you want to delete this user?")){
+	var selectedUser = $(this).find("option:selected").attr("value");
+	$.each(users.rows, function(r) {
+		if(users.rows[r].id == selectedUser) 
+		{
+		var userDoc = {		// json string of id and username
+		_id:users.rows[r].key[0],
+		_rev: users.rows[r].key[1]};
+		$.couch.db("_users").removeDoc(userDoc, {
+			success: function(sccs){
+			alert("User deleted.");
+			getUsers();
+			},
+			error: function(err){
+			alert("ERROR: User NOT deleted!");
+			}});
+		}
+	});
+	}
+});
+
+//
+// create user processing
+//
+$('#form_createUser').submit(function(e) { // create a new user
+	e.preventDefault();
+	loginCheck();
+	if($('#new_passwd').val()!==$('#new_passwd0').val())
+	{
+		alert("Passwords do not match.");
+		return false;
+	}
+	if($('#new_username').val()=="" || $('#new_passwd').val()=="")
+	{
+		alert("Cannot submit empty form.");
+		return false;
+	}
+	var userDoc = {		// json string of id and username
+	    _id: "org.couchdb.user:"+$('#new_username').val(),
+	    name: $('#new_username').val()
+	};
+	$.couch.signup(userDoc, $('#new_passwd').val(), { // signup new user
+	    success: function(data) {
+		$('#new_username').val("");
+		$('#new_passwd').val("");
+		$('#new_passwd0').val("");
+		alert("New user created.");
+		getUsers();
+	    },
+	    error: function(status) {
+	    	if(status==409) {
+	    	alert("ERROR: Username already exists.\r\nError Code: "+status);}
+	    	else {
+	    	alert("ERROR: New user not created.\r\nError Code: "+status);}
+	    }
+	});
+});
+
+//
+// login form processing 
+//
+	$('#login_form').submit(function(e) {
+	e.preventDefault(); 	// do NOT submit that form
+	$.couch.login({  	// may I relax on the couch?
+		    name: $('#uname').val(),
+		    password: $('#passwd').val(),
+		    success: function(data) {
+			doLogin(); // validate your seat on the couch.
+		    },
+		    error: function(status) { // sad trombone
+			alert("Login failed. Invalid username or password.");
+		    }
+		});
+	});
+	
+//
+// logout processing 
+//
+function logout(){ // get off the couch!
+	$.couch.logout({
+	    success: function(data) {
+		//console.log(data);
+		doLogin(); // make sure you're not relaxing on the couch.
+	    }
+	});
+}
+	
+</script>
+</html>
