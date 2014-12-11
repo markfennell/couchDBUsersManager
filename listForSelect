@@ -1,0 +1,15 @@
+REQUIRED: create a listForSelect design view like below.
+{
+   "_id": "_design/views",
+   "_rev": "6-223064c4048b8b4927c54dd8f10adc4b",
+   "language": "javascript",
+   "views": {
+       "listForSelect": {
+           "map": "function(doc) {
+           var key;
+           if(doc.name != "admin"){
+           key = [doc._id, doc._rev, doc.roles];
+           emit(key, doc.name);}}"
+       }
+   }
+}
